@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Feedback } from './feedback.entity';
@@ -17,6 +17,11 @@ export class FeedbackService {
 
   // Add a new feedback to the database
   async addFeedback(email: string, text: string): Promise<Feedback> {
+    const count = await this.feedbackRepository.count();
+    if (count >= 50) {
+      throw new BadRequestException('Feedback limit reached (50)');
+    }
+
     const feedback = new Feedback();
     feedback.email = email;
     feedback.text = text;
