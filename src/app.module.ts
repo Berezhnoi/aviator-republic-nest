@@ -1,29 +1,42 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { FeedbackModule } from './feedback.module';
+import { UserModule } from './user/user.module';
 import { ConfigModule } from '@nestjs/config';
-console.log(process.env.DB_PASSWORD)
+import { FirebaseSetup } from './firebase/firebase.setup';
+import { RequestLoggerMiddleware } from './request-logger/request-logger.middleware';
+import { SequelizeModule } from '@nestjs/sequelize';
+import { AuthModule } from './auth/auth.module';
+import { User } from './user/user.entity';
+import { Dialect } from 'sequelize/types';
+import * as process from 'node:process';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // Make config variables available globally
+      isGlobal: true,
+      envFilePath: '.env',
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
+    SequelizeModule.forRoot({
+      dialect: process.env.DB_DIALECT as Dialect,
       host: process.env.DB_HOST,
-      port: !!process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-      username: process.env.DB_USER,
+      port: Number(process.env.DB_PORT),
+      username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true, // Set to false in production for safety
+      database: process.env.DB_DATABASE,
+      autoLoadModels: true,
+      synchronize: false,
+      models: [User],
     }),
-    FeedbackModule,
+    SequelizeModule.forFeature([User]),
+    UserModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, FirebaseSetup],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}
